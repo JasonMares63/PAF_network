@@ -112,11 +112,8 @@ class RealNVP(nn.Module):
     """
     RealNVP normalizing flow 
 
-    Learns p(x) as a pushforward of a standard normal through
+    Learns p(x) as a pushforward of a LogNormal through
     a sequence of invertible transformations:
-
-        z = f_K ∘ ... ∘ f_1(x)
-        log p(x) = log p_z(z) + Σ log|det(∂f_k/∂x_{k-1})|
     """
 
     def __init__(
@@ -194,6 +191,7 @@ class RealNVP(nn.Module):
         log_pz = self.prior.log_prob(z)
         return -(log_pz +log_det)
     
+    @torch.no_grad
     def _get_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Compute log p(x) under the learned distribution."""
         z, _ = self.forward(x)

@@ -28,11 +28,9 @@ class MultiScaleBlock(nn.Module):
         super().__init__()
         self.dropout = dropout
         # 1. LOCAL SCALE: GAT (With Attention)
-        # Learns high-resolution, specific neighbor interactions
         self.local_gat = GATv2Conv(esm_dim, hidden_dim, heads=4, concat=True, edge_dim=1,dropout = self.dropout)
         
         # 2. GLOBAL SCALE: SAGE (With Mean/Sum Aggregation)
-        # Takes the GAT output and looks 2-hops away to find global context
         self.global_sage = SAGEConv(hidden_dim * 4, esm_dim)
         self.norm = nn.LayerNorm(esm_dim)
         
