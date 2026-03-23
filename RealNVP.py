@@ -189,7 +189,7 @@ class RealNVP(nn.Module):
         """Return log p(z) + log determinant."""
         z, log_det = self.forward(x)
         log_pz = self.prior.log_prob(z)
-        return -(log_pz +log_det)
+        return -(log_pz + log_det)
     
     @torch.no_grad
     def _get_prob(self, x: torch.Tensor) -> torch.Tensor:

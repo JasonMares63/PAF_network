@@ -9,7 +9,7 @@ from torch.cuda.amp import autocast, GradScaler
 
 class PAF_trainer(nn.Module):
     def __init__(self,
-                 x_esm_embed,
+                 x_esm_dim,
                  hidden_dim=128,
                  output_dim=64,
                  n_layers = 4,
@@ -21,7 +21,7 @@ class PAF_trainer(nn.Module):
                  device ="cpu"):
         super().__init__()
         
-        self.esm_dim = x_esm_embed.shape[1]
+        self.esm_dim = x_esm_dim,
         self.hidden_dim = hidden_dim
         self.output_dim = output_dim
         self.device = device
@@ -138,26 +138,39 @@ class PAF_trainer(nn.Module):
                         esm_embed,
                         prior_edge_index ,prior_edge_weights,
                         valid_edge_index,valid_edge_weights,
-                         epochs = 100):
+                         epochs = 100, verbose=True):
         #best_loss = float("inf")
-        pbar = tqdm.tqdm(range(1,epochs+1),
-                             desc="Training Progress", unit="epoch")
+        if verbose:
+            pbar = tqdm.tqdm(range(1,epochs+1),
+                                desc="Training Progress", unit="epoch")
 
-        for epoch in pbar:
-            train_loss = self.train_step_embeddings(esm_embed, prior_edge_index ,prior_edge_weights)
-            self.train_CL_history.append(train_loss.item())
-            valid_loss = self.valid_step_embeddings(esm_embed, valid_edge_index,valid_edge_weights)
-            self.valid_CL_history.append(valid_loss.item())
-            if self.best_CL > valid_loss:
-                self.best_CL = valid_loss
-                self.best_state = {
-                    k: v.cpu().clone()
-                    for k, v in self.model.state_dict().items()
-                }
-            pbar.set_postfix({"Epoch": f"{epoch:4d}/{epochs}",
-                                    "Tr": f"{train_loss:.4f}",
-                                    "Vall": f"{valid_loss:.4f}"})
-
+            for epoch in pbar:
+                train_loss = self.train_step_embeddings(esm_embed, prior_edge_index ,prior_edge_weights)
+                self.train_CL_history.append(train_loss.item())
+                valid_loss = self.valid_step_embeddings(esm_embed, valid_edge_index,valid_edge_weights)
+                self.valid_CL_history.append(valid_loss.item())
+                if self.best_CL > valid_loss:
+                    self.best_CL = valid_loss
+                    self.best_state = {
+                        k: v.cpu().clone()
+                        for k, v in self.model.state_dict().items()
+                    }
+                pbar.set_postfix({"Epoch": f"{epoch:4d}/{epochs}",
+                                        "Tr": f"{train_loss:.4f}",
+                                        "Vall": f"{valid_loss:.4f}"})
+        else:
+            for epoch in range(1,epochs+1):
+                train_loss = self.train_step_embeddings(esm_embed, prior_edge_index ,prior_edge_weights)
+                self.train_CL_history.append(train_loss.item())
+                valid_loss = self.valid_step_embeddings(esm_embed, valid_edge_index,valid_edge_weights)
+                self.valid_CL_history.append(valid_loss.item())
+                if self.best_CL > valid_loss:
+                    self.best_CL = valid_loss
+                    self.best_state = {
+                        k: v.cpu().clone()
+                        for k, v in self.model.state_dict().items()
+                    }
+        
         if self.best_state is not None:
             self.model.load_state_dict(self.best_state)
             #print(f"\nRestored best model (val_nll={best_val:.4f})")
@@ -166,28 +179,41 @@ class PAF_trainer(nn.Module):
     def train_predictor(self,
                          esm_embed,
                          prior_edge_index ,prior_edge_weights,
-                        valid_edge_index,valid_edge_weights,
-                         epochs = 100):
+                         valid_edge_index,valid_edge_weights,
+                         epochs = 100,verbose = True):
         assert self.best_state is not None, 'train emebeddings first'
         
-        pbar = tqdm.tqdm(range(1,epochs+1),
-                             desc="Training Progress", unit="epoch")
+        if verbose:
+            pbar = tqdm.tqdm(range(1,epochs+1),
+                                desc="Training Progress", unit="epoch")
 
-        for epoch in pbar:
-            train_loss = self.train_step_prediction(esm_embed, prior_edge_index ,prior_edge_weights)
-            self.train_MSE_history.append(train_loss.item())
-            valid_loss = self.valid_step_prediction(esm_embed, valid_edge_index,valid_edge_weights)
-            self.valid_MSE_history.append(valid_loss.item())
-            if self.best_MSE > valid_loss:
-                self.best_MSE = valid_loss
-                self.best_state2 = {
-                    k: v.cpu().clone()
-                    for k, v in self.model2.state_dict().items()
-                }
-            pbar.set_postfix({"Epoch": f"{epoch:4d}/{epochs}",
-                                    "Tr": f"{train_loss:.4f}",
-                                    "Vall": f"{valid_loss:.4f}"})
-
+            for epoch in pbar:
+                train_loss = self.train_step_prediction(esm_embed, prior_edge_index ,prior_edge_weights)
+                self.train_MSE_history.append(train_loss.item())
+                valid_loss = self.valid_step_prediction(esm_embed, valid_edge_index,valid_edge_weights)
+                self.valid_MSE_history.append(valid_loss.item())
+                if self.best_MSE > valid_loss:
+                    self.best_MSE = valid_loss
+                    self.best_state2 = {
+                        k: v.cpu().clone()
+                        for k, v in self.model2.state_dict().items()
+                    }
+                pbar.set_postfix({"Epoch": f"{epoch:4d}/{epochs}",
+                                        "Tr": f"{train_loss:.4f}",
+                                        "Vall": f"{valid_loss:.4f}"})
+        else:
+            for epoch in range(1,epochs+1):
+                train_loss = self.train_step_prediction(esm_embed, prior_edge_index ,prior_edge_weights)
+                self.train_MSE_history.append(train_loss.item())
+                valid_loss = self.valid_step_prediction(esm_embed, valid_edge_index,valid_edge_weights)
+                self.valid_MSE_history.append(valid_loss.item())
+                if self.best_MSE > valid_loss:
+                    self.best_MSE = valid_loss
+                    self.best_state2 = {
+                        k: v.cpu().clone()
+                        for k, v in self.model2.state_dict().items()
+                    }
+                    
         if self.best_state2 is not None:
             self.model2.load_state_dict(self.best_state2)
             #print(f"\nRestored best model (val_nll={best_val:.4f})")
@@ -241,8 +267,8 @@ class PAF_trainer(nn.Module):
     def train_flow(self,
                     esm_embed, prior_edge_index ,prior_edge_weights,
                     valid_edge_index,valid_edge_weights,
-                    percentile = 0.5, epochs = 100):
-        assert self.best_state is not None, 'train emebeddings first'
+                    percentile = 0.5, epochs = 100,verbose=True):
+        assert self.best_state is not None, 'train embeddings first'
         
         self.threshold = torch.quantile(prior_edge_weights, percentile)
         prior_edge_index = prior_edge_index[:, prior_edge_weights >= self.threshold]
@@ -253,23 +279,36 @@ class PAF_trainer(nn.Module):
         assert len(prior_edge_weights) >= 10, f'threshold too high, training set too small now, currently {len(prior_edge_weights)}'
         assert len(valid_edge_weights) >= 10, f'threshold too high, validation set too small now, currently {len(valid_edge_weights)}'
         
-        pbar = tqdm.tqdm(range(1,epochs+1),
-                             desc="Training Progress", unit="epoch")
-        for epoch in pbar:
-            train_loss = self.train_step_flow(esm_embed, prior_edge_index ,prior_edge_weights)
-            self.train_NLL_history.append(train_loss.item())
-            valid_loss = self.valid_step_flow(esm_embed, valid_edge_index,valid_edge_weights)
-            self.valid_NLL_history.append(valid_loss.item())
-            if self.best_NLL > valid_loss:
-                self.best_NLL = valid_loss
-                self.best_state3 = {
-                    k: v.cpu().clone()
-                    for k, v in self.model3.state_dict().items()
-                }
-            pbar.set_postfix({"Epoch": f"{epoch:4d}/{epochs}",
-                                    "Tr": f"{train_loss:.4f}",
-                                    "Vall": f"{valid_loss:.4f}"})
-
+        if verbose:
+            pbar = tqdm.tqdm(range(1,epochs+1),
+                                desc="Training Progress", unit="epoch")
+            for epoch in pbar:
+                train_loss = self.train_step_flow(esm_embed, prior_edge_index ,prior_edge_weights)
+                self.train_NLL_history.append(train_loss.item())
+                valid_loss = self.valid_step_flow(esm_embed, valid_edge_index,valid_edge_weights)
+                self.valid_NLL_history.append(valid_loss.item())
+                if self.best_NLL > valid_loss:
+                    self.best_NLL = valid_loss
+                    self.best_state3 = {
+                        k: v.cpu().clone()
+                        for k, v in self.model3.state_dict().items()
+                    }
+                pbar.set_postfix({"Epoch": f"{epoch:4d}/{epochs}",
+                                        "Tr": f"{train_loss:.4f}",
+                                        "Vall": f"{valid_loss:.4f}"})
+        else:
+            for epoch in range(1,epochs+1):
+                train_loss = self.train_step_flow(esm_embed, prior_edge_index ,prior_edge_weights)
+                self.train_NLL_history.append(train_loss.item())
+                valid_loss = self.valid_step_flow(esm_embed, valid_edge_index,valid_edge_weights)
+                self.valid_NLL_history.append(valid_loss.item())
+                if self.best_NLL > valid_loss:
+                    self.best_NLL = valid_loss
+                    self.best_state3 = {
+                        k: v.cpu().clone()
+                        for k, v in self.model3.state_dict().items()
+                    }
+                    
         if self.best_state3 is not None:
             self.model3.load_state_dict(self.best_state3)
         return self.best_NLL
