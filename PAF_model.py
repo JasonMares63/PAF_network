@@ -21,11 +21,10 @@ class PAF_trainer(nn.Module):
                  device ="cpu"):
         super().__init__()
         
-        self.esm_dim = x_esm_dim,
+        self.esm_dim = x_esm_dim
         self.hidden_dim = hidden_dim
         self.output_dim = output_dim
         self.device = device
-        self.esm_embed = x_esm_embed
 
         self.lr = lr
         self.l2_coef = l2_coef
