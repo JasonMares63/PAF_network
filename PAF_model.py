@@ -24,7 +24,7 @@ class PAF_trainer(nn.Module):
         self.esm_dim = x_esm_dim,
         self.hidden_dim = hidden_dim
         self.output_dim = output_dim
-        self.device = device
+        self.device = torch.device(device)
         self.esm_embed = x_esm_embed
 
         self.lr = lr
@@ -35,7 +35,8 @@ class PAF_trainer(nn.Module):
                                        num_scales = 2,
                                        proj_dim = self.output_dim,
                                        dropout = self.GAT_dropout,
-                                       )
+                                       ).to(self.device)
+                     
         self.optimizer =torch.optim.AdamW(
             self.model.parameters(),
             lr=self.lr[0],
@@ -45,7 +46,8 @@ class PAF_trainer(nn.Module):
         
         self.classifier_dropout = dropout[1]
         self.model2 = DeepScalePrediction(proj_dim = self.output_dim,
-                                          dropout = self.classifier_dropout)
+                                          dropout = self.classifier_dropout).to(self.device)
+
         self.optimizer2 =torch.optim.AdamW(
             self.model2.parameters(),
             lr=self.lr[1],
@@ -61,7 +63,7 @@ class PAF_trainer(nn.Module):
         self.threshold = None
         self.model3 = RealNVP(self.output_dim*2, self.n_layers,
                               n_flows = self.n_flows,
-                              hidden_dim = self.hidden_dim,dropout = self.flow_dropout)
+                              hidden_dim = self.hidden_dim,dropout = self.flow_dropout).to(self.device)
         
         self.optimizer3 =torch.optim.AdamW(
         self.model3.parameters(),
@@ -86,7 +88,11 @@ class PAF_trainer(nn.Module):
         self.model.train()
         self.optimizer.zero_grad()
         
-        with autocast(self.device):
+        prior_esm_embed = prior_esm_embed.to(self.device)
+        prior_edge_index = prior_edge_index.to(self.device)
+        prior_edge_weights = prior_edge_weights.to(self.device)
+        
+        with autocast(device_type=self.device.type, enabled=(self.device.type == "cuda")):
             loss = self.model(prior_esm_embed ,prior_edge_index,prior_edge_weights)
         
         loss.backward()
@@ -100,9 +106,13 @@ class PAF_trainer(nn.Module):
         
         self.model2.train()
         self.optimizer2.zero_grad()
+
+        prior_esm_embed = prior_esm_embed.to(self.device)
+        prior_edge_index = prior_edge_index.to(self.device)
+        prior_edge_weights = prior_edge_weights.to(self.device)
         
         u, v = prior_edge_index
-        with autocast(self.device):
+        with autocast(device_type=self.device.type, enabled=(self.device.type == "cuda")):
             with torch.no_grad():
                 h = self.model.get_embeddings(prior_esm_embed, prior_edge_index ,prior_edge_weights)
             
@@ -118,6 +128,11 @@ class PAF_trainer(nn.Module):
     def valid_step_embeddings(self,valid_esm_embed, valid_edge_index,valid_edge_weights):
         
         self.model.eval()
+
+        valid_esm_embed = valid_esm_embed.to(self.device)
+        valid_edge_index = valid_edge_index.to(self.device)
+        valid_edge_weights = valid_edge_weights.to(self.device)
+        
         loss = self.model(valid_esm_embed,
                           valid_edge_index,
                           valid_edge_weights)
@@ -131,6 +146,11 @@ class PAF_trainer(nn.Module):
             h = self.model.get_embeddings(valid_esm_embed, valid_edge_index,valid_edge_weights)
         u, v = valid_edge_index
         self.model2.eval()
+        
+        valid_esm_embed = valid_esm_embed.to(self.device)
+        valid_edge_index = valid_edge_index.to(self.device)
+        valid_edge_weights = valid_edge_weights.to(self.device)
+
         loss, _ = self.model2(h[u] ,h[v],valid_edge_weights)
         return loss
             
@@ -222,6 +242,11 @@ class PAF_trainer(nn.Module):
     def _get_embeddings(self,x, edge_index=None,edge_weights= None):
         assert self.best_state is not None, 'train emebeddings first'
         with torch.no_grad():
+            x = x.to(self.device)
+            if edge_index is not None:
+                edge_index = edge_index.to(self.device)
+            if edge_weights is not None:
+                edge_weights = edge_weights.to(self.device)
             emb = self.model.get_embeddings(x,edge_index,edge_weights)
         return emb
     
@@ -229,6 +254,8 @@ class PAF_trainer(nn.Module):
         assert self.best_state2 is not None, 'train classifier first'
 
         with torch.no_grad():
+            x_emb1 = x_emb1.to(self.device)
+            x_emb2 = x_emb2.to(self.device)
             out = self.model2(x_emb1,x_emb2)
         return out
         
@@ -236,10 +263,14 @@ class PAF_trainer(nn.Module):
                         ):
         self.model3.train()
         self.optimizer3.zero_grad()
+                            
+        prior_esm_embed = prior_esm_embed.to(self.device)
+        prior_edge_index = prior_edge_index.to(self.device)
+        prior_edge_weights = prior_edge_weights.to(self.device)
         
         #keep = prior_edge_weights >= threshold
         u, v = prior_edge_index
-        with autocast(self.device):
+        with autocast(device_type=self.device.type, enabled=(self.device.type == "cuda")):
             with torch.no_grad():
                 h = self.model.get_embeddings(prior_esm_embed,prior_edge_index,
                                               prior_edge_weights)
@@ -254,6 +285,9 @@ class PAF_trainer(nn.Module):
     
     def valid_step_flow(self, valid_esm_embed, valid_edge_index,valid_edge_weights):
         
+        valid_esm_embed = valid_esm_embed.to(self.device)
+        valid_edge_index = valid_edge_index.to(self.device)
+        valid_edge_weights = valid_edge_weights.to(self.device)
         #keep = valid_edge_weights >= threshold
         u, v = valid_edge_index
         with torch.no_grad():
@@ -315,6 +349,8 @@ class PAF_trainer(nn.Module):
     
     def _get_edge_prob(self,x_emb1, x_emb2):
         assert self.best_state3 is not None, 'train flow model first'
+        x_emb1 = x_emb1.to(self.device)
+        x_emb2 = x_emb2.to(self.device)
         emb = self.cat_emb(x_emb1,x_emb2)
         prob = self.model3._get_prob(emb)
         return prob
