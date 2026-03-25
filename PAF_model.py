@@ -86,7 +86,7 @@ class PAF_trainer(nn.Module):
         self.model.train()
         self.optimizer.zero_grad()
         
-        with autocast(self.device):
+        with autocast(device_type="cuda", enabled=(self.device == "cuda")):
             loss = self.model(prior_esm_embed ,prior_edge_index,prior_edge_weights)
         
         loss.backward()
@@ -102,7 +102,7 @@ class PAF_trainer(nn.Module):
         self.optimizer2.zero_grad()
         
         u, v = prior_edge_index
-        with autocast(self.device):
+        with autocast(device_type="cuda", enabled=(self.device == "cuda")):
             with torch.no_grad():
                 h = self.model.get_embeddings(prior_esm_embed, prior_edge_index ,prior_edge_weights)
             
@@ -239,7 +239,7 @@ class PAF_trainer(nn.Module):
         
         #keep = prior_edge_weights >= threshold
         u, v = prior_edge_index
-        with autocast(self.device):
+        with autocast(device_type="cuda", enabled=(self.device == "cuda")):
             with torch.no_grad():
                 h = self.model.get_embeddings(prior_esm_embed,prior_edge_index,
                                               prior_edge_weights)
