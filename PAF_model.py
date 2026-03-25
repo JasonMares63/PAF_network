@@ -5,7 +5,8 @@ import numpy as np
 import tqdm
 from PAF import *
 from RealNVP import *
-from torch.cuda.amp import autocast, GradScaler
+from torch.amp import autocast
+from torch.cuda.amp import GradScaler
 
 class PAF_trainer(nn.Module):
     def __init__(self,
